@@ -1,199 +1,547 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-  <meta charset="UTF-8">
-  <title> ซิทคอม Gojek M3U </title></title>
-  <style>
-    body {
-      margin: 0;
-      display: flex;
-      height: 100vh;
-      font-family: sans-serif;
-      background-color: #000;
-    }
-    #menu {
-      width: 25%;
-      background: #6a1b9a;
-      color: white;
-      overflow-y: auto;
-      padding: 10px;
-      transition: transform 0.3s ease;
-    }
-    #menu.hidden {
-      transform: translateX(-100%);
-    }
-    #menu h3 {
-      text-align: center;
-      margin-top: 0;
-    }
-    .group {
-      margin-bottom: 10px;
-    }
-    .group h4 {
-      margin: 5px 0;
-      padding: 8px;
-      background: #7e57c2;
-      border-radius: 4px;
-      cursor: pointer;
-    }
-    .channel-list {
-      display: none;
-      padding-left: 10px;
-    }
-    .channel {
-      cursor: pointer;
-      margin: 6px 0;
-      padding: 8px;
-      background: #ce93d8;
-      border-radius: 5px;
-      display: flex;
-      align-items: center;
-      transition: 0.2s;
-    }
-    .channel:hover, .channel.active {
-      background: #f06292;
-      color: white;
-    }
-    .channel img {
-      width: 50px;
-      height: 50px;
-      object-fit: contain;
-      margin-right: 10px;
-    }
-    #player-container {
-      flex: 1;
-      background: black;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      position: relative;
-    }
-    #video {
-      width: 100%;
-      height: 100%;
-      object-fit: contain;
-      background: black;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ผู้เฒ่าพเนจร</title>
+    <!-- โครงสร้าง Style เดิม 100% + เพิ่ม CSS สำหรับหมวดหมู่ -->
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #1a1a1a; color: white; margin: 0; display: flex; height: 100vh; overflow: hidden; }
+        
+        #sidebar { width: 250px; background-color: #2c2c2c; display: flex; flex-direction: column; border-right: 1px solid #444; transition: transform 0.3s ease; }
+        #sidebar.hidden { transform: translateX(-100%); position: absolute; height: 100%; z-index: 1000; }
+        .sidebar-header { padding: 20px; text-align: center; background-color: #ffcc00; color: #000; font-weight: bold; font-size: 1.2em; display: flex; justify-content: space-between; align-items: center; }
+        .close-btn { background: none; border: none; font-size: 1.5em; cursor: pointer; display: none; }
+        #channel-list { flex: 1; overflow-y: auto; padding: 10px; }
+        .channel-item { display: flex; align-items: center; padding: 10px; cursor: pointer; border-radius: 5px; margin-bottom: 5px; transition: background 0.2s; }
+        .channel-item:hover { background-color: #444; }
+        .channel-item img { width: 40px; height: 40px; margin-right: 10px; object-fit: contain; background: #fff; border-radius: 4px; padding: 2px; }
+        .channel-item span { font-size: 0.9em; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+        
+        /* เพิ่มสไตล์สำหรับหมวดหมู่ */
+        .category-header { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            padding: 12px 10px; 
+            background-color: #3a3a3a; 
+            color: #ffcc00; 
+            font-weight: bold; 
+            cursor: pointer; 
+            border-bottom: 1px solid #555; 
+            user-select: none;
+            transition: background-color 0.2s;
+        }
+        .category-header:hover { background-color: #444; }
+        .category-header.active { background-color: #555; }
+        .category-toggle { font-size: 1.2em; transition: transform 0.3s; }
+        .category-toggle.collapsed { transform: rotate(-90deg); }
+        .category-content { 
+            max-height: 0; 
+            overflow: hidden; 
+            transition: max-height 0.3s ease-out; 
+            background-color: #2a2a2a; 
+        }
+        .category-content.expanded { 
+            max-height: 500px; 
+            overflow-y: auto; 
+        }
+        .channel-item.selected {
+            background-color: #ff0000 !important;
+            border: 2px solid #ffcc00;
+            box-shadow: 0 0 10px rgba(255, 204, 0, 0.5);
+        }
+
+        #main-content { flex: 1; display: flex; flex-direction: column; position: relative; }
+        #top-bar { padding: 10px 20px; background-color: #2c2c2c; display: flex; align-items: center; }
+        #menu-toggle { background: none; border: none; color: white; font-size: 1.5em; cursor: pointer; margin-right: 15px; }
+        
+        #video-container { flex: 1; background: #000; position: relative; display: flex; justify-content: center; align-items: center; }
+        video, #jw-player-div { width: 100%; height: 100%; }
+
+        #player-status {
+            position: absolute; top: 10px; right: 10px;
+            background: rgba(0,0,0,0.7); color: #00ff00;
+            padding: 5px 10px; border: 1px solid #00ff00; border-radius: 4px;
+            font-size: 14px; pointer-events: none; z-index: 9999; display: none;
+        }
+
+        #player-controls {
+            padding: 15px; background-color: #222;
+            display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;
+        }
+        .player-select-btn {
+            background-color: #ffcc00; border: none; padding: 8px 16px; border-radius: 4px;
+            cursor: pointer; font-weight: bold; color: #000;
+        }
+        .player-select-btn.active { background-color: #ff0000; color: #fff; }
+        .loading-text { text-align: center; color: #aaa; padding: 20px; }
+
+        @media (max-width: 768px) {
+            #sidebar { position: absolute; z-index: 1000; height: 100%; transform: translateX(-100%); }
+            #sidebar.active { transform: translateX(0); }
+            .close-btn { display: block; }
+        }
+    </style>
+
+    <!-- Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/4.7.11/shaka-player.compiled.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <link href="https://vjs.zencdn.net/7.20.3/video-js.css" rel="stylesheet" />
+    <script src="https://vjs.zencdn.net/7.20.3/video.min.js"></script>
+    <script>jwplayer.key = 'ITWMv7t88JGzI0xPwW8I0+LveiXX9SWbfdmt0ArUSyc=';</script>
+    <script src="//content.jwplatform.com/libraries/SAHhwvZq.js"></script>
+
 </head>
 <body>
-  <div id="menu">
-    <h3>📺 รายการช่อง</h3>
-    <div id="channel-list"></div>
-  </div>
 
-  <div id="player-container">
-    <video id="video" controls autoplay></video>
-  </div>
+    <div id="sidebar">
+        <div class="sidebar-header">ผู้เฒ่าพเนจร<button class="close-btn" onclick="toggleSidebar()">×</button></div>
+        <div id="channel-list"><div class="loading-text">กำลังโหลดหมวดหมู่...</div></div>
+    </div>
 
-  <script>
-    const playlistURL = "https://dl.dropbox.com/scl/fi/uo1car54okz22dzl9gxqo/.m3u?rlkey=o3wcb2kp166lxe0lym21l065o&dl=1";
-    let channels = [];
+    <div id="main-content">
+        <div id="top-bar">
+            <button id="menu-toggle" onclick="toggleSidebar()">☰</button>
+            <span id="current-channel-name">กรุณาเลือกช่องรายการ</span>
+        </div>
 
-    async function loadM3U(url) {
-      const res = await fetch(url);
-      const text = await res.text();
-      const lines = text.split('\n');
+        <div id="video-container">
+            <div id="player-status"></div>
+            <!-- Video Elements -->
+            <video id="shaka-video" controls autoplay style="display:none; width:100%; height:100%;"></video>
+            <video id="hls-video" controls style="display:none; width:100%; height:100%;"></video>
+            <video id="vjs-video" class="video-js vjs-default-skin" controls style="display:none; width:100%; height:100%;"></video>
+            <div id="jw-player-div" style="display:none;"></div>
+        </div>
 
-      let current = {};
-      const list = [];
+        <div id="player-controls">
+            <!-- ปุ่มควบคุม Player ทั้งหมด - เปลี่ยนลำดับใหม่ -->
+            <button class="player-select-btn active" onclick="changePlayer('mx', this)">MX Player</button>
+            <button class="player-select-btn" onclick="changePlayer('hls', this)">HLS.js</button>
+            <button class="player-select-btn" onclick="changePlayer('jw', this)">JW Player</button>
+            <button class="player-select-btn" onclick="changePlayer('videojs', this)">Video.js</button>
+            <button class="player-select-btn" onclick="changePlayer('wiseplay', this)">Wiseplay</button>
+            <button class="player-select-btn" onclick="changePlayer('iptv', this)">IPTV Pro</button>
+            <button class="player-select-btn" onclick="changePlayer('exo', this)">ExoPlayer</button>
+            <button class="player-select-btn" onclick="changePlayer('shaka', this)">Shaka Player</button>
+        </div>
+    </div>
 
-      for (let i = 0; i < lines.length; i++) {
-        const line = lines[i].trim();
+    <script>
+        // --- ส่วนที่แก้ไข: Proxy Settings แบบ Robust ---
+        // ลิงก์ต้นทาง
+        const DROPBOX_URL = 'https://www.dropbox.com/scl/fi/uo1car54okz22dzl9gxqo/.m3u?rlkey=o3wcb2kp166lxe0lym21l065o&dl=1';
+        
+        // รายชื่อ Proxy ที่จะใช้สลับกันเมื่อตัวใดตัวหนึ่งล่ม (เรียงตามลำดับความเสถียร)
+        const PROXY_LIST = [
+            'https://corsproxy.io/?', // มักจะเสถียรกว่า
+            'https://api.allorigins.win/raw?url=', // ตัวเดิม
+            'https://api.codetabs.com/v1/proxy?quest=' // ตัวสำรอง
+        ];
+        
+        var channels = [];
+        var categories = {};
+        var currentPlayer = 'mx'; 
+        var currentUrl = '';
+        var currentChannelId = null;
+        var currentOpenCategory = null;
+        var shakaInstance = null;
+        var jwInstance = null;
+        var videoJsPlayer = null;
+        var hlsObj = null;
 
-        if (line.startsWith("#EXTINF:")) {
-          const nameMatch = line.match(/,(.*)$/);
-          const logoMatch = line.match(/tvg-logo="(.*?)"/);
-          const groupMatch = line.match(/group-title="(.*?)"/);
-
-          current = {
-            title: nameMatch ? nameMatch[1] : "ไม่ทราบชื่อ",
-            logo: logoMatch ? logoMatch[1] : "",
-            group: groupMatch ? groupMatch[1] : "ไม่มีหมวดหมู่"
-          };
-        } else if (line && !line.startsWith("#")) {
-          current.url = line;
-          list.push({ ...current });
+        function toggleSidebar() {
+            var sidebar = document.getElementById('sidebar');
+            sidebar.classList.toggle('active');
+            if(window.innerWidth > 768) sidebar.classList.toggle('hidden');
         }
-      }
 
-      return list;
-    }
+        // --- ฟังก์ชันใหม่: ระบบโหลดแบบ Multi-Proxy Fallback ---
+        async function fetchAndParsePlaylist() {
+            const listElement = document.getElementById('channel-list');
+            
+            for (let i = 0; i < PROXY_LIST.length; i++) {
+                const proxyUrl = PROXY_LIST[i];
+                // สร้าง URL สุดท้ายโดยการ encode URL ของ Dropbox
+                const finalUrl = proxyUrl + encodeURIComponent(DROPBOX_URL);
+                
+                try {
+                    console.log(`Attempting to load from Proxy ${i + 1}: ${proxyUrl}`);
+                    listElement.innerHTML = `<div class="loading-text">กำลังโหลดหมวดหมู่...<br><span style="font-size:0.8em;color:#666">(Server ${i+1})</span></div>`;
 
-    function renderChannels() {
-      const container = document.getElementById("channel-list");
-      container.innerHTML = "";
+                    // เพิ่ม Timeout เพื่อไม่ให้รอนานเกินไป (10 วินาที)
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 10000);
 
-      const groups = [...new Set(channels.map(c => c.group))];
+                    const response = await fetch(finalUrl, { signal: controller.signal });
+                    clearTimeout(timeoutId);
 
-      groups.forEach(group => {
-        const groupDiv = document.createElement("div");
-        groupDiv.className = "group";
+                    if (!response.ok) throw new Error(`Status ${response.status}`);
+                    
+                    const text = await response.text();
+                    if (!text || text.length < 10) throw new Error('Empty response');
 
-        const header = document.createElement("h4");
-        header.textContent = group;
-        header.onclick = () => {
-          listDiv.style.display = listDiv.style.display === "block" ? "none" : "block";
-        };
+                    console.log("Success! M3U loaded.");
+                    parseM3U(text);
+                    return; // จบการทำงานเมื่อโหลดสำเร็จ
 
-        const listDiv = document.createElement("div");
-        listDiv.className = "channel-list";
+                } catch (error) {
+                    console.warn(`Proxy ${i + 1} failed:`, error);
+                    // ถ้ายังไม่หมด Proxy ให้วนลูปต่อ
+                    continue;
+                }
+            }
 
-        channels
-          .filter(c => c.group === group)
-          .forEach((ch, index) => {
-            const div = document.createElement("div");
-            div.className = "channel";
-            div.innerHTML = `${ch.logo ? `<img src="${ch.logo}" alt="${ch.title}">` : ""}<span>${ch.title}</span>`;
-            div.onclick = () => playChannel(ch);
-            listDiv.appendChild(div);
-          });
+            // ถ้าวนครบทุก Proxy แล้วยังไม่ได้
+            console.error('All proxies failed.');
+            listElement.innerHTML = 
+                '<div class="loading-text" style="color:red">ไม่สามารถโหลด Playlist ได้<br>เซิร์ฟเวอร์ทุกตัวไม่ตอบสนอง<br>กรุณาลองใหม่อีกครั้งภายหลัง</div>';
+        }
 
-        groupDiv.appendChild(header);
-        groupDiv.appendChild(listDiv);
-        container.appendChild(groupDiv);
-      });
-    }
+        function parseM3U(m3uText) {
+            channels = [];
+            categories = {};
+            const lines = m3uText.split('\n');
+            let currentChannel = {};
+            let channelId = 1;
+            let currentGroup = 'ทั่วไป'; // หมวดหมู่เริ่มต้น
 
-    function playChannel(channel) {
-      document.querySelectorAll(".channel").forEach(el => el.classList.remove("active"));
-      const all = [...document.querySelectorAll(".channel")];
-      const found = all.find(el => el.textContent.trim() === channel.title.trim());
-      if (found) found.classList.add("active");
+            for (let i = 0; i < lines.length; i++) {
+                let line = lines[i].trim();
+                
+                if (line.startsWith('#EXTINF:')) {
+                    currentChannel = {};
+                    
+                    // ดึงข้อมูลจาก EXTINF line
+                    const extinfLine = line;
+                    
+                    // หาชื่อช่อง (หลังคอมม่า)
+                    const commaIndex = extinfLine.lastIndexOf(',');
+                    if (commaIndex !== -1) {
+                        currentChannel.name = extinfLine.substring(commaIndex + 1).trim();
+                    } else {
+                        currentChannel.name = 'Unknown Channel';
+                    }
+                    
+                    // ดึงโลโก้
+                    const logoMatch = extinfLine.match(/tvg-logo="([^"]*)"/i) || extinfLine.match(/tvg-logo=([^" ]+)/i);
+                    currentChannel.logo = logoMatch ? logoMatch[1] : 'https://via.placeholder.com/50?text=TV';
+                    
+                    // ดึงหมวดหมู่ (group-title)
+                    const groupMatch = extinfLine.match(/group-title="([^"]*)"/i) || extinfLine.match(/group-title=([^" ]+)/i);
+                    currentGroup = groupMatch ? groupMatch[1].trim() : 'ทั่วไป';
+                    
+                    currentChannel.category = currentGroup;
+                    currentChannel.id = 'channel-' + channelId++;
+                    
+                    // ตรวจสอบบรรทัดถัดไปสำหรับ URL
+                    if (i + 1 < lines.length) {
+                        let nextLine = lines[i + 1].trim();
+                        if (nextLine && !nextLine.startsWith('#')) {
+                            currentChannel.url = nextLine;
+                            channels.push(currentChannel);
+                            
+                            // จัดกลุ่มตามหมวดหมู่
+                            if (!categories[currentGroup]) {
+                                categories[currentGroup] = [];
+                            }
+                            categories[currentGroup].push(currentChannel);
+                            
+                            i++; // ข้ามบรรทัด URL
+                        }
+                    }
+                }
+            }
+            
+            console.log("Parsed categories:", Object.keys(categories)); // Debug log
+            console.log("Total channels:", channels.length); // Debug log
+            
+            renderCategories();
+        }
 
-      const video = document.getElementById("video");
-      video.src = channel.url;
-      video.play();
-      requestFullscreen(video);
-    }
+        function renderCategories() {
+            var list = document.getElementById('channel-list');
+            list.innerHTML = '';
+            
+            if(Object.keys(categories).length === 0) { 
+                list.innerHTML = '<div class="loading-text">ไม่พบรายการช่องในไฟล์ M3U<br>หรือรูปแบบไฟล์ไม่ถูกต้อง</div>'; 
+                return; 
+            }
 
-    async function init() {
-      channels = await loadM3U(playlistURL);
-      renderChannels();
-      if (channels.length > 0) playChannel(channels[0]);
-    }
+            // เรียงลำดับหมวดหมู่ โดยให้หมวดหมู่ที่มีชื่อว่า "Digital TV", "TV", "ทีวี" อยู่บนสุด
+            var sortedCategories = Object.keys(categories).sort((a, b) => {
+                const aLower = a.toLowerCase();
+                const bLower = b.toLowerCase();
+                
+                // จัดลำดับความสำคัญของหมวดหมู่
+                const priority = {
+                    'digital tv': 1,
+                    'ทีวีดิจิตอล': 1,
+                    'tv': 2,
+                    'ทีวี': 2,
+                    'news': 3,
+                    'ข่าว': 3,
+                    'sport': 4,
+                    'กีฬา': 4,
+                    'movie': 5,
+                    'หนัง': 5
+                };
+                
+                const aPriority = priority[aLower] || 99;
+                const bPriority = priority[bLower] || 99;
+                
+                if (aPriority !== bPriority) {
+                    return aPriority - bPriority;
+                }
+                
+                return a.localeCompare(b);
+            });
 
-    function requestFullscreen(element) {
-      if (element.requestFullscreen) element.requestFullscreen();
-      else if (element.webkitRequestFullscreen) element.webkitRequestFullscreen();
-      else if (element.mozRequestFullScreen) element.mozRequestFullScreen();
-      else if (element.msRequestFullscreen) element.msRequestFullscreen();
-    }
+            sortedCategories.forEach(function(categoryName, index) {
+                // สร้างหัวข้อหมวดหมู่
+                var categoryDiv = document.createElement('div');
+                categoryDiv.className = 'category';
+                categoryDiv.id = 'category-' + categoryName.replace(/\s+/g, '-').replace(/[^\w\-]/g, '');
+                
+                var header = document.createElement('div');
+                header.className = 'category-header';
+                
+                // เปิดหมวดหมู่แรกโดยอัตโนมัติถ้าไม่มี Digital TV
+                if (index === 0) {
+                    header.classList.add('active');
+                    currentOpenCategory = categoryDiv.id;
+                }
+                
+                header.setAttribute('data-category', categoryDiv.id);
+                header.onclick = function() { toggleCategory(this); };
+                
+                var title = document.createElement('span');
+                title.innerText = categoryName + ' (' + categories[categoryName].length + ')';
+                
+                var toggle = document.createElement('span');
+                toggle.className = 'category-toggle';
+                toggle.innerText = '▼';
+                
+                if (index === 0) {
+                    toggle.classList.remove('collapsed');
+                } else {
+                    toggle.classList.add('collapsed');
+                }
+                
+                header.appendChild(title);
+                header.appendChild(toggle);
+                
+                // สร้างส่วนเนื้อหาของหมวดหมู่
+                var content = document.createElement('div');
+                content.className = 'category-content';
+                if (index === 0) {
+                    content.classList.add('expanded');
+                }
+                
+                // เพิ่มช่องรายการในหมวดหมู่
+                categories[categoryName].forEach(function(channel) {
+                    var item = document.createElement('div');
+                    item.className = 'channel-item';
+                    item.id = channel.id;
+                    item.onclick = function() { selectChannel(channel, this); };
+                    
+                    var img = document.createElement('img');
+                    img.src = channel.logo;
+                    img.onerror = function() { 
+                        this.src = 'https://via.placeholder.com/50x50/333/fff?text=' + 
+                                  encodeURIComponent(channel.name.substring(0, 2).toUpperCase()); 
+                    };
+                    
+                    var span = document.createElement('span');
+                    span.innerText = channel.name;
+                    
+                    item.appendChild(img); 
+                    item.appendChild(span); 
+                    content.appendChild(item);
+                });
+                
+                categoryDiv.appendChild(header);
+                categoryDiv.appendChild(content);
+                list.appendChild(categoryDiv);
+            });
+            
+            // แสดงข้อความสรุป
+            var totalChannels = channels.length;
+            var totalCategories = sortedCategories.length;
+            var summary = document.createElement('div');
+            summary.className = 'loading-text';
+            summary.style.fontSize = '12px';
+            summary.innerText = `พบ ${totalCategories} หมวดหมู่, ${totalChannels} ช่องรายการ`;
+            list.appendChild(summary);
+        }
 
-    document.addEventListener("DOMContentLoaded", () => {
-      const video = document.getElementById("video");
-      const menu = document.getElementById("menu");
+        function toggleCategory(headerElement) {
+            var categoryId = headerElement.getAttribute('data-category');
+            var categoryDiv = document.getElementById(categoryId);
+            var content = categoryDiv.querySelector('.category-content');
+            var toggle = headerElement.querySelector('.category-toggle');
+            
+            // ถ้าคลิกหมวดหมู่ที่กำลังเปิดอยู่ให้ปิด
+            if (content.classList.contains('expanded')) {
+                content.classList.remove('expanded');
+                toggle.classList.add('collapsed');
+                headerElement.classList.remove('active');
+                currentOpenCategory = null;
+            } else {
+                // ปิดหมวดหมู่อื่นๆ ที่เปิดอยู่
+                if (currentOpenCategory && currentOpenCategory !== categoryId) {
+                    var openCategory = document.getElementById(currentOpenCategory);
+                    if (openCategory) {
+                        var openContent = openCategory.querySelector('.category-content');
+                        var openToggle = openCategory.querySelector('.category-toggle');
+                        var openHeader = openCategory.querySelector('.category-header');
+                        
+                        openContent.classList.remove('expanded');
+                        openToggle.classList.add('collapsed');
+                        openHeader.classList.remove('active');
+                    }
+                }
+                
+                // เปิดหมวดหมู่ที่เลือก
+                content.classList.add('expanded');
+                toggle.classList.remove('collapsed');
+                headerElement.classList.add('active');
+                currentOpenCategory = categoryId;
+            }
+        }
 
-      video.addEventListener("click", () => {
-        menu.classList.toggle("hidden");
-      });
+        function selectChannel(channel, element) {
+            // ลบการเลือกช่องเดิม
+            if (currentChannelId) {
+                var prevSelected = document.getElementById(currentChannelId);
+                if (prevSelected) {
+                    prevSelected.classList.remove('selected');
+                }
+            }
+            
+            // เลือกช่องใหม่
+            currentChannelId = channel.id;
+            element.classList.add('selected');
+            
+            // เล่นช่องที่เลือก
+            playChannel(channel);
+        }
 
-      video.addEventListener("touchstart", () => {
-        menu.classList.toggle("hidden");
-      });
+        function changePlayer(player, btn) {
+            currentPlayer = player;
+            var btns = document.querySelectorAll('.player-select-btn');
+            btns.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            if(currentUrl) playStream(currentUrl);
+        }
 
-      init();
-    });
-  </script>
+        function playChannel(channel) {
+            document.getElementById('current-channel-name').innerText = channel.name;
+            currentUrl = channel.url;
+            playStream(currentUrl);
+            if(window.innerWidth <= 768) document.getElementById('sidebar').classList.remove('active');
+        }
+
+        // --- ฟังก์ชันสร้าง Intent แบบ Robust ---
+        function openIntent(url, packageName) {
+            // แยก Scheme (http/https) ออกจาก URL
+            var scheme = 'http';
+            var cleanUrl = url;
+            
+            if (url.startsWith('https://')) {
+                scheme = 'https';
+                cleanUrl = url.substring(8); // ตัด https://
+            } else if (url.startsWith('http://')) {
+                scheme = 'http';
+                cleanUrl = url.substring(7); // ตัด http://
+            }
+
+            // สร้าง Intent URI ตามมาตรฐาน Chrome Android
+            // รูปแบบ: intent://host/path#Intent;scheme=...;package=...;type=video/*;end;
+            var intentUri = "intent://" + cleanUrl + "#Intent;scheme=" + scheme + ";type=video/*;package=" + packageName + ";end";
+            
+            // สั่งเปิด
+            window.location.href = intentUri;
+        }
+
+        async function playStream(url) {
+            stopAllPlayers();
+            var statusLabel = document.getElementById('player-status');
+            statusLabel.style.display = 'block';
+
+            // ตรวจสอบว่าเป็น External App หรือไม่ (mx, wiseplay, iptv, exo)
+            if (currentPlayer === 'mx' || currentPlayer === 'wiseplay' || 
+                currentPlayer === 'iptv' || currentPlayer === 'exo') {
+                
+                statusLabel.innerText = "เปิดแอปพลิเคชันภายนอก...";
+                
+                if (currentPlayer === 'mx') {
+                    openIntent(url, "com.mxtech.videoplayer.ad");
+                } else if (currentPlayer === 'wiseplay') {
+                    openIntent(url, "com.wiseplay");
+                } else if (currentPlayer === 'iptv') {
+                    openIntent(url, "ru.iptvremote.android.iptv.pro");
+                } else if (currentPlayer === 'exo') {
+                    // ExoPlayer (JustPlayer)
+                    openIntent(url, "com.brouken.player"); 
+                }
+                
+            } else if (currentPlayer === 'shaka') {
+                statusLabel.innerText = "กำลังเล่น: Shaka Player";
+                var vid = document.getElementById('shaka-video');
+                vid.style.display = 'block';
+                shaka.polyfill.installAll();
+                if (shaka.Player.isBrowserSupported()) {
+                    shakaInstance = new shaka.Player(vid);
+                    try { await shakaInstance.load(url); vid.play(); } catch (e) { console.error('Error', e); }
+                }
+
+            } else if (currentPlayer === 'hls') {
+                statusLabel.innerText = "กำลังเล่น: HLS.js";
+                var vid = document.getElementById('hls-video');
+                vid.style.display = 'block';
+                if (Hls.isSupported()) {
+                    hlsObj = new Hls(); hlsObj.loadSource(url); hlsObj.attachMedia(vid);
+                    hlsObj.on(Hls.Events.MANIFEST_PARSED, function() { vid.play(); });
+                } else if (vid.canPlayType('application/vnd.apple.mpegurl')) { vid.src = url; vid.play(); }
+
+            } else if (currentPlayer === 'jw') {
+                statusLabel.innerText = "กำลังเล่น: JW Player";
+                document.getElementById('jw-player-div').style.display = 'block';
+                jwInstance = jwplayer("jw-player-div").setup({
+                    file: url, type: "hls", width: "100%", height: "100%", autostart: true
+                });
+
+            } else if (currentPlayer === 'videojs') {
+                statusLabel.innerText = "กำลังเล่น: Video.js";
+                var vjsEl = document.getElementById('vjs-video');
+                vjsEl.style.display = 'block';
+                if(!videoJsPlayer) videoJsPlayer = videojs('vjs-video');
+                videoJsPlayer.src({ type: 'application/x-mpegURL', src: url });
+                videoJsPlayer.play();
+            }
+        }
+
+        function stopAllPlayers() {
+            var shakaVid = document.getElementById('shaka-video');
+            shakaVid.pause(); shakaVid.style.display = 'none';
+            if (shakaInstance) { shakaInstance.destroy(); shakaInstance = null; }
+
+            var hlsVid = document.getElementById('hls-video');
+            hlsVid.pause(); hlsVid.style.display = 'none';
+            if(hlsObj) { hlsObj.destroy(); hlsObj = null; }
+
+            if(jwInstance) { jwInstance.remove(); jwInstance = null; }
+            document.getElementById('jw-player-div').style.display = 'none';
+
+            var vjsEl = document.getElementById('vjs-video');
+            vjsEl.style.display = 'none';
+            if(videoJsPlayer) videoJsPlayer.pause();
+        }
+
+        window.onload = fetchAndParsePlaylist;
+
+    </script>
 </body>
 </html>
